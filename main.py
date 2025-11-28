@@ -90,7 +90,7 @@ def main():
 
             # 날짜 범위 순회
             for current_date in utils.generate_date_range(start_date, end_date):
-                print(f"[INFO] 날짜 {current_date} 처리 중...")
+                print(f"[INFO] Site_Unit={row['Site_Unit']}, Factory={row.get('Factory', '')}, 날짜 {current_date} 처리 중...")
 
                 try:
                     crawler.set_date(current_date)
@@ -99,18 +99,16 @@ def main():
                     # 1. 15분 모드
                     print("    [STEP] 15분 모드 조회 시작")
                     crawler.set_mode_15m()
-                    print("15분 선택 완료")
+                    #print("15분 선택 완료")
                     time.sleep(2)
                     crawler.click_lookup()
-                    print("    [STEP] 15분 모드 조회 버튼 클릭")
+                    #print("    [STEP] 15분 모드 조회 버튼 클릭")
                     crawler.wait_for_background_disappear()
                     df_15m = crawler.extract_table()
                     df_15m = data_processor.process_dataframe(
                         df_15m, '15m', row['Project'], row['Site_Unit'], row.get('Factory', ''), current_date
                     )
                     dfs_15m.append(df_15m)
-                    print(df_15m)
-                    print(f"15분 데이터 행 수: {len(df_15m)}")
                     print("    [DONE] 15분 데이터 처리 완료")
 
                     # # 2. 30분 모드
@@ -124,7 +122,7 @@ def main():
                         df_30m, '30m', row['Project'], row['Site_Unit'], row.get('Factory', ''), current_date
                     )
                     dfs_30m.append(df_30m)
-                    print(f"30분 데이터 행 수: {len(df_30m)}")
+                    #print(f"30분 데이터 행 수: {len(df_30m)}")
                     print("    [DONE] 30분 데이터 처리 완료")
 
                 except Exception as e:
