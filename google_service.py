@@ -118,40 +118,16 @@ def upload_to_drive(file_path, file_name, folder_id):
     return uploaded.get('id')
 
 
-def get_bigquery_client():
-    """
-    Cloud Run 환경에서 ADC를 사용하여 BigQuery 클라이언트를 초기화합니다.
-    """
-    # google.auth.default()를 사용하여 현재 환경의 자격 증명을 자동으로 로드합니다.
-    # BigQuery 클라이언트는 로드된 자격 증명을 사용하여 초기화됩니다.
-    try:
-        credentials, project_id = google.auth.default(
-            # BigQuery API를 사용하기 위한 최소한의 스코프를 지정합니다.
-            scopes=["https://www.googleapis.com/auth/cloud-platform"]
-        )
-        return bigquery.Client(credentials=credentials, project=BQ_PROJECT_ID)
-    except Exception as e:
-        print(f"[ERROR] BigQuery 클라이언트 초기화 실패. 서비스 계정 권한 확인: {e}")
-        raise e
-
-
-# [수정할 파일: google_service.py]
-
 def upload_to_bigquery(df: pd.DataFrame, full_table_id: str, write_disposition: str = 'WRITE_APPEND') -> None:
     """
     Args:
         full_table_id (str): "프로젝트ID.데이터셋ID.테이블ID" 형태의 전체 경로
     """
     try:
-        # 1. 전체 경로에서 '프로젝트 ID'만 추출 (첫 번째 점 앞부분)
-        # 예: "kr-ops-vk-operations.99999_tests..." -> "kr-ops-vk-operations"
         project_id = full_table_id.split('.')[0]
-        
-        # 2. 클라이언트 생성 (추출한 프로젝트 ID 사용)
         credentials, _ = google.auth.default()
         client = bigquery.Client(credentials=credentials, project=project_id)
 
-        # 3. Job 설정
         job_config = bigquery.LoadJobConfig(
             write_disposition=write_disposition,
             source_format=bigquery.SourceFormat.PARQUET,

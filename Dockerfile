@@ -17,11 +17,11 @@ ENV CHROME_DIR /opt/chrome
 # 쉘 스크립트 RUN 명령: CfT API를 호출하여 동적으로 최신 안정 버전의 URL 획득 및 설치
 RUN CHROME_LATEST_VERSION_URL=$( \
         curl -sL https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json | \
-        jq -r '.versions | select(.version | test("^[0-9]+(\.[0-9]+){3}$")) |.downloads.chrome | select(.platform == "linux64") |.url' | tail -1 \
+        jq -r '.versions[] | select(.version | test("^[0-9]+(\.[0-9]+){3}$")) |.downloads.chrome | select(.platform == "linux64") |.url' | tail -1 \
     ) && \
     CHROMEDRIVER_LATEST_URL=$( \
         curl -sL https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json | \
-        jq -r '.versions | select(.version | test("^[0-9]+(\.[0-9]+){3}$")) |.downloads.chromedriver | select(.platform == "linux64") |.url' | tail -1 \
+        jq -r '.versions[] | select(.version | test("^[0-9]+(\.[0-9]+){3}$")) |.downloads.chromedriver | select(.platform == "linux64") |.url' | tail -1 \
     ) && \
     
     # Chrome 설치
@@ -34,6 +34,7 @@ RUN CHROME_LATEST_VERSION_URL=$( \
     # ChromeDriver 설치
     wget -q -O chromedriver.zip "$CHROMEDRIVER_LATEST_URL" && \
     unzip -j chromedriver.zip chromedriver-linux64/chromedriver -d $CHROMEDRIVER_DIR && \
+    chmod +x $CHROMEDRIVER_DIR/chromedriver && \
     rm chromedriver.zip
 
 # 3단계: Python 환경 구성
