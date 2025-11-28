@@ -128,6 +128,8 @@ def transform_for_bigquery(df: pd.DataFrame, mode: str) -> pd.DataFrame:
     melted['measure_point'] = melted['original_column'].apply(lambda x: value_columns[x][0])
     melted['measure_unit'] = melted['original_column'].apply(lambda x: value_columns[x][1])
 
+    melted['measure_value'] = pd.to_numeric(melted['measure_value'], errors='coerce')
+
     # 데이터 타입 변환 및 정리
     # 'DateTime' 컬럼이 문자열인 경우 datetime 객체로 변환
     try:

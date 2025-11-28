@@ -136,7 +136,7 @@ def upload_to_bigquery(df: pd.DataFrame, full_table_id: str, write_disposition: 
 
         # 4. DataFrame을 메모리에서 Parquet로 변환
         buffer = io.BytesIO()
-        df.to_parquet(buffer, index=False)
+        df.to_parquet(buffer, index=False, allow_truncated_timestamps=True, coerce_timestamps='us')
         buffer.seek(0)
 
         # 5. 업로드 (full_table_id 그대로 사용)

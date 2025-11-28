@@ -1,0 +1,15 @@
+# 1. 파이썬 및 OS (무거움)
+FROM python:3.11-slim
+
+# 2. 크롬 및 드라이버 설치 (가장 무거움 - 몇 분 걸림)
+RUN apt-get update && \
+    apt-get install -y \
+    chromium-driver \
+    curl unzip \
+    && apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# 3. 파이썬 라이브러리 설치 (무거움)
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
