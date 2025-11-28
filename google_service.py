@@ -8,6 +8,7 @@ from google.cloud import bigquery
 from google.auth.transport.requests import Request 
 from google.cloud import secretmanager
 from google.cloud import firestore
+from itertools import zip_longes
 import json
 # 기존 config에서 필요한 값들만 임포트
 from config import GOOGLE_DRIVE_FOLDER_ID, SCOPES, SHEET_ID, SHEET_RANGE, BQ_PROJECT_ID, BQ_DATASET_ID, BQ_TABLE_ID 
@@ -75,14 +76,19 @@ def read_google_sheet() -> list[dict]:
     values = result.get('values', [])
 
     if not values or len(values) < 2:
-        raise ValueError("시트에 데이터가 없거나 헤더가 누락되었습니다.")
+        # 데이터가 없어도 에러 대신 빈 리스트 반환이 나을 수 있음 (선택 사항)
+        print("[WARN] 시트에 데이터가 없습니다.")
+        return []
 
     header = values[0]
-    data = [dict(zip(header, row)) for row in values[1:]]
-    # print("=== 읽어온 데이터 ===")
-    # for row in data:
-    #     print(row)
-    # print("===================")
+    
+    # [수정] zip 대신 zip_longest 사용
+    # fillvalue='' 옵션으로 비어있는 셀은 빈 문자열로 채움
+    data = [
+        dict(zip_longest(header, row, fillvalue='')) 
+        for row in values[1:]
+    ]
+
     return data
 
 

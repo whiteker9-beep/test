@@ -9,6 +9,7 @@ import os
 from googleapiclient.errors import HttpError
 import time 
 from selenium.common.exceptions import TimeoutException
+from webdriver_initializer import initialize_chrome_driver
 import google_service as gcp 
 
 def main():
@@ -46,7 +47,7 @@ def main():
     print("[INFO] Chrome 드라이버 실행 중...")
     options = webdriver.ChromeOptions()
     options.add_argument("--guest")
-    driver = webdriver.Chrome(options=options)
+    driver = initialize_chrome_driver() 
     crawler = WebCrawler(driver)
 
     for idx, row in enumerate(records, 1):
@@ -139,9 +140,10 @@ def main():
             print("[INFO] 15분 데이터 병합 중...")
             final_15m = data_processor.merge_dataframes(dfs_15m, '15m')
             file_name_15m = f'kepco_power_15m_{current_time}.xlsx'
-            path_15m = os.path.join(r'D:\RPA\Download\KEPCO', file_name_15m)
+            # 리눅스 컨테이너의 임시 저장소 사용
+            path_15m = os.path.join('/tmp', file_name_15m)
             final_15m.to_excel(path_15m, index=False)
-            google.upload_to_drive(path_15m, file_name_15m)
+            gcp.upload_to_drive(path_15m, file_name_15m)
             print(f"[UPLOAD] 15분 데이터 업로드 완료: {file_name_15m}")
         except HttpError as e:
             print(f"[ERROR] 15분 Google Drive 업로드 실패: {e}")
@@ -154,9 +156,10 @@ def main():
             print("[INFO] 30분 데이터 병합 중...")
             final_30m = data_processor.merge_dataframes(dfs_30m, '30m')
             file_name_30m = f'kepco_power_30m_{current_time}.xlsx'
-            path_30m = os.path.join(r'D:\RPA\Download\KEPCO', file_name_30m)
+            # 리눅스 임시 폴더(/tmp)로 변경
+            path_30m = os.path.join('/tmp', file_name_30m)
             final_30m.to_excel(path_30m, index=False)
-            google.upload_to_drive(path_30m, file_name_30m)
+            gcp.upload_to_drive(path_30m, file_name_30m)
             print(f"[UPLOAD] 30분 데이터 업로드 완료: {file_name_30m}")
         except HttpError as e:
             print(f"[ERROR] 30분 Google Drive 업로드 실패: {e}")
@@ -169,7 +172,7 @@ def main():
         # 먼저 DataFrame들을 병합
         merged_15m = data_processor.merge_dataframes(dfs_15m, '15m')
         # 병합된 DataFrame을 BigQuery용으로 변환
-        transformed_15m = upload_bigquery.transform_for_bigquery(merged_15m, '15m')
+        transformed_15m = data_processor.transform_for_bigquery(merged_15m, '15m')
         print("[INFO] 15분 데이터 BigQuery 변환 완료")
     else:
         print("[INFO] 15분 데이터가 없어 BigQuery 변환을 건너뜁니다.")
@@ -178,28 +181,28 @@ def main():
         # 먼저 DataFrame들을 병합
         merged_30m = data_processor.merge_dataframes(dfs_30m, '30m')
         # 병합된 DataFrame을 BigQuery용으로 변환
-        transformed_30m = upload_bigquery.transform_for_bigquery(merged_30m, '30m')
+        transformed_30m = data_processor.transform_for_bigquery(merged_30m, '30m')
         print("[INFO] 30분 데이터 BigQuery 변환 완료")
     else:
         print("[INFO] 30분 데이터가 없어 BigQuery 변환을 건너뜁니다.")
 
     # BigQuery 업로드
-    # try:
-    #     if dfs_15m:
-    #         upload_bigquery.upload_to_bigquery(
-    #             transformed_15m,
-    #             credentials_path=r'D:\path\to\service_account.json',
-    #             write_disposition='WRITE_APPEND'
-    #         )
-    #     if dfs_30m:
-    #         upload_bigquery.upload_to_bigquery(
-    #             transformed_30m,
-    #             credentials_path=r'D:\path\to\service_account.json',
-    #             write_disposition='WRITE_APPEND'
-    #         )
-    # except Exception as e:
-    #     print(f"[ERROR] BigQuery 업로드 실패: {e}")
-    #     raise
+    try:
+        if dfs_15m:
+            # credentials_path 인자 삭제
+            gcp.upload_to_bigquery(
+                transformed_15m,
+                write_disposition='WRITE_APPEND'
+            )
+        if dfs_30m:
+            # credentials_path 인자 삭제
+            gcp.upload_to_bigquery(
+                transformed_30m,
+                write_disposition='WRITE_APPEND'
+            )
+    except Exception as e:
+        print(f"[ERROR] BigQuery 업로드 실패: {e}")
+        raise
 
     
     print("\n[SUCCESS] 전체 KEPCO 작업 완료")

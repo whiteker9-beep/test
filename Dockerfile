@@ -39,3 +39,10 @@ RUN CHROME_LATEST_VERSION_URL=$( \
 # 3단계: Python 환경 구성
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+#
+COPY . . 
+# 현재 폴더의 모든 소스코드 복사 (requirements.txt만 복사했던 위 단계 아래에 추가)
+
+# 컨테이너 시작 시 실행할 명령어
+CMD ["python", "main.py"]
