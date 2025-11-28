@@ -8,10 +8,10 @@ from google.cloud import bigquery
 from google.auth.transport.requests import Request 
 from google.cloud import secretmanager
 from google.cloud import firestore
-from itertools import zip_longes
+from itertools import zip_longest
 import json
 # 기존 config에서 필요한 값들만 임포트
-from config import GOOGLE_DRIVE_FOLDER_ID, SCOPES, SHEET_ID, SHEET_RANGE, BQ_PROJECT_ID, BQ_DATASET_ID, BQ_TABLE_ID 
+from config import SCOPES, SHEET_ID, SHEET_RANGE
 
 from datetime import datetime, timezone
 
@@ -66,7 +66,7 @@ def read_google_sheet() -> list[dict]:
     """
     creds = get_credentials()
     service = build('sheets', 'v4', credentials=creds)
-    sheet = service.spreadsheets()
+    sheet = service.spreadsheets() # type: ignore
 
     result = sheet.values().get(
         spreadsheetId=SHEET_ID,
@@ -92,14 +92,14 @@ def read_google_sheet() -> list[dict]:
     return data
 
 
-def upload_to_drive(file_path, file_name):
+def upload_to_drive(file_path, file_name, folder_id): 
     creds = get_credentials()
     drive_service = build('drive', 'v3', credentials=creds)
 
     file_metadata = {
         'name': file_name,
         'mimeType': 'application/vnd.google-apps.spreadsheet',
-        'parents': [GOOGLE_DRIVE_FOLDER_ID]  # config에서 불러온 값
+        'parents': [folder_id]  # [변경점] 전달받은 folder_id 사용
     }
 
     media = MediaFileUpload(
@@ -135,46 +135,45 @@ def get_bigquery_client():
         raise e
 
 
-def upload_to_bigquery(df: pd.DataFrame, write_disposition: str = 'WRITE_APPEND') -> None:
-    """
-    Cloud Run 환경에서 Pandas DataFrame을 BigQuery 테이블에 업로드합니다.
-    ADC를 사용하므로 별도의 credentials_path가 필요 없습니다.
+# [수정할 파일: google_service.py]
 
+def upload_to_bigquery(df: pd.DataFrame, full_table_id: str, write_disposition: str = 'WRITE_APPEND') -> None:
+    """
     Args:
-        df (pd.DataFrame): DataFrame to upload.
-        write_disposition (str): WRITE_APPEND (추가) 또는 WRITE_TRUNCATE (덮어쓰기).
+        full_table_id (str): "프로젝트ID.데이터셋ID.테이블ID" 형태의 전체 경로
     """
     try:
-        # BigQuery 클라이언트 초기화 (ADC 사용)
-        client = get_bigquery_client()
+        # 1. 전체 경로에서 '프로젝트 ID'만 추출 (첫 번째 점 앞부분)
+        # 예: "kr-ops-vk-operations.99999_tests..." -> "kr-ops-vk-operations"
+        project_id = full_table_id.split('.')[0]
+        
+        # 2. 클라이언트 생성 (추출한 프로젝트 ID 사용)
+        credentials, _ = google.auth.default()
+        client = bigquery.Client(credentials=credentials, project=project_id)
 
-        # Define job configuration
+        # 3. Job 설정
         job_config = bigquery.LoadJobConfig(
             write_disposition=write_disposition,
             source_format=bigquery.SourceFormat.PARQUET,
-            # 스키마 자동 감지 (DataFrame 컬럼명과 타입 기반)
             autodetect=True 
         )
 
-        # Convert DataFrame to Parquet in memory
+        # 4. DataFrame을 메모리에서 Parquet로 변환
         buffer = io.BytesIO()
         df.to_parquet(buffer, index=False)
         buffer.seek(0)
 
-        # Full table path
-        full_table_id = f"{BQ_PROJECT_ID}.{BQ_DATASET_ID}.{BQ_TABLE_ID}"
-
-        # Upload to BigQuery
+        # 5. 업로드 (full_table_id 그대로 사용)
         print(f"[INFO] BigQuery 업로드 시작: {full_table_id}, 모드: {write_disposition}")
         job = client.load_table_from_file(buffer, full_table_id, job_config=job_config)
-        job.result()  # Wait for job to complete
+        job.result()  # 완료 대기
 
-        # Confirm upload
+        # 6. 결과 확인
         table = client.get_table(full_table_id)
-        print(f"[SUCCESS] Uploaded {job.output_rows} rows to {full_table_id}. Total rows: {table.num_rows}")
+        print(f"[SUCCESS] {full_table_id}에 {job.output_rows}행 업로드 완료. (총 {table.num_rows}행)")
         
     except Exception as e:
-        print(f"[ERROR] Failed to upload to BigQuery: {e}")
+        print(f"[ERROR] BigQuery 업로드 실패: {e}")
         raise
 
 

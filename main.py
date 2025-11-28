@@ -15,8 +15,14 @@ import google_service as gcp
 def main():
     # 1. Firestore에서 크롤링 메타정보 가져오기
     firestore_data = gcp.get_firestore_data('kepco_power')
+
+    login_url = ""
+    folder_id = ""
+    table_id = ""
+    secret_name = ""
+
     for doc in firestore_data:
-        doc_data = doc._data
+        doc_data = doc.to_dict() 
         login_url = doc_data.get("login_url")
         folder_id = doc_data.get("folder_id")
         table_id = doc_data.get("table_id")
@@ -38,7 +44,7 @@ def main():
     utils.ensure_dir_exists(GOOGLE_DRIVE_FOLDER_ID) 
 
     print("[INFO] Google Sheet에서 설정 데이터 읽는 중...")
-    records = google.read_google_sheet()
+    records = gcp.read_google_sheet()
     print(f"[INFO] 총 {len(records)}개의 프로젝트 레코드 로드됨")
 
     dfs_15m = []
@@ -70,7 +76,7 @@ def main():
                 crawler.login(
                     user_id=row['ID'],
                     password=row['PW'],
-                    login_url=LOGIN_URL,
+                    login_url=login_url,  # [변경점] 변수로 교체
                     id_selector=ID_SELECTOR,
                     pw_selector=PW_SELECTOR,
                     submit_selector=SUBMIT_SELECTOR
@@ -143,7 +149,8 @@ def main():
             # 리눅스 컨테이너의 임시 저장소 사용
             path_15m = os.path.join('/tmp', file_name_15m)
             final_15m.to_excel(path_15m, index=False)
-            gcp.upload_to_drive(path_15m, file_name_15m)
+            gcp.upload_to_drive(path_15m, file_name_15m, folder_id=folder_id)
+
             print(f"[UPLOAD] 15분 데이터 업로드 완료: {file_name_15m}")
         except HttpError as e:
             print(f"[ERROR] 15분 Google Drive 업로드 실패: {e}")
@@ -159,7 +166,7 @@ def main():
             # 리눅스 임시 폴더(/tmp)로 변경
             path_30m = os.path.join('/tmp', file_name_30m)
             final_30m.to_excel(path_30m, index=False)
-            gcp.upload_to_drive(path_30m, file_name_30m)
+            gcp.upload_to_drive(path_30m, file_name_30m, folder_id=folder_id)
             print(f"[UPLOAD] 30분 데이터 업로드 완료: {file_name_30m}")
         except HttpError as e:
             print(f"[ERROR] 30분 Google Drive 업로드 실패: {e}")
@@ -189,17 +196,21 @@ def main():
     # BigQuery 업로드
     try:
         if dfs_15m:
-            # credentials_path 인자 삭제
+            # [수정] full_table_id 인자에 Firestore 값(table_id) 전달
             gcp.upload_to_bigquery(
                 transformed_15m,
+                full_table_id=table_id,  
                 write_disposition='WRITE_APPEND'
             )
+            
         if dfs_30m:
-            # credentials_path 인자 삭제
+            # [수정] 30분 데이터도 동일하게
             gcp.upload_to_bigquery(
                 transformed_30m,
+                full_table_id=table_id,
                 write_disposition='WRITE_APPEND'
             )
+            
     except Exception as e:
         print(f"[ERROR] BigQuery 업로드 실패: {e}")
         raise
